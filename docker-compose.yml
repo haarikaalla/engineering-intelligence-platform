@@ -1,0 +1,57 @@
+name: eip
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eip
+      POSTGRES_USER: eip
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eip"]
+      interval: 5s
+      retries: 10
+
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+      NEO4J_server_memory_heap_max__size: 1G
+    ports: ["7474:7474"]   # Neo4j Browser for ad-hoc Cypher exploration
+    volumes: [neo4jdata:/data]
+
+  chroma:
+    image: chromadb/chroma:latest
+    volumes: [chromadata:/data]
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://eip:${POSTGRES_PASSWORD}@postgres:5432/eip
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      CORS_ORIGINS: '["http://localhost:3000"]'
+    volumes: [workspace:/data/workspace]
+    depends_on:
+      postgres: { condition: service_healthy }
+      neo4j: { condition: service_started }
+      chroma: { condition: service_started }
+    ports: ["8000:8000"]
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+      EIP_API_KEY: ${API_KEY:-}
+    depends_on: [backend]
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:
+  neo4jdata:
+  chromadata:
+  workspace:

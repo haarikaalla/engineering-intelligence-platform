@@ -1,0 +1,10 @@
+# Minimal runtime: embedded graph store, NumPy vector store, regex/AST parsers, offline reasoning.
+fastapi>=0.111
+uvicorn[standard]>=0.29
+pydantic>=2.6
+pydantic-settings>=2.2
+sqlalchemy>=2.0.29
+python-multipart>=0.0.9
+httpx>=0.27
+numpy>=1.26
+pyyaml>=6.0

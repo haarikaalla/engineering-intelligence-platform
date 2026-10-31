@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: eip
+resources:
+  - namespace.yaml
+  - config.yaml
+  - postgres.yaml
+  - neo4j.yaml
+  - chroma.yaml
+  - backend.yaml
+  - frontend.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+images:
+  - name: eip-backend
+    newName: registry.example.com/eip/backend
+    newTag: "1.0.0"
+  - name: eip-frontend
+    newName: registry.example.com/eip/frontend
+    newTag: "1.0.0"

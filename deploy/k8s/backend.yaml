@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eip-workspace
+spec:
+  # ReadWriteMany (e.g. Azure Files / EFS / Filestore) is required to run more than one backend replica.
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 100Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8000 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: backend
+          image: eip-backend
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - configMapRef: { name: eip-config }
+            - secretRef: { name: eip-secrets }
+          env:
+            - { name: WORKSPACE_DIR, value: /data/workspace }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: workspace, mountPath: /data/workspace }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: workspace
+          persistentVolumeClaim: { claimName: eip-workspace }
+        - name: tmp
+          emptyDir: { sizeLimit: 10Gi }
